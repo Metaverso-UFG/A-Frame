@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>MetaversoUFG</title>
+    <meta name="description" content="Multi Streams Example — Networked-Aframe" />
+
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.5.0/socket.io.slim.js"></script>
+    <script src="/easyrtc/easyrtc.js"></script>
+    <script src="/dist/networked-aframe.js"></script>
+    <script>
+      // see issue https://github.com/networked-aframe/networked-aframe/issues/267
+      NAF.schemas.getComponentsOriginal = NAF.schemas.getComponents;
+      NAF.schemas.getComponents = (template) => {
+        if (!NAF.schemas.hasTemplate('#avatar-template')) {
+          NAF.schemas.add({
+            template: '#avatar-template',
+            components: [
+              'position',
+              'rotation',
+              'player-info',
+              {
+                selector: '.head',
+                component: 'material',
+                property: 'color'
+              }
+            ]
+          });
+        }
+        if (!NAF.schemas.hasTemplate('#sphere-template')) {
+          NAF.schemas.add({
+            template: '#sphere-template',
+            components: [
+              'position',
+              {
+                component: 'material',
+                property: 'color'
+              }
+            ]
+          });
+        }
+        const components = NAF.schemas.getComponentsOriginal(template);
+        return components;
+      };
+    </script>
+        <script>
+          window.ntExample = {
+            randomColor: () => {
+              return '#' + new THREE.Color(Math.random(), Math.random(), Math.random()).getHexString();
+            }
+          };
+    
+          AFRAME.registerComponent('player-info', {
+            // notice that color and name are both listed in the schema; NAF will only keep
+            // properties declared in the schema in sync.
+            schema: {
+              name: { type: 'string', default: 'user-' + Math.round(Math.random() * 10000) },
+              color: {
+                type: 'color', // btw: color is just a string under the hood in A-Frame
+                default: window.ntExample.randomColor()
+              }
+            },
+    
+            init: function () {
+              this.head = this.el.querySelector('.head');
+              this.nametag = this.el.querySelector('.nametag');
+    
+              this.ownedByLocalUser = this.el.id === 'player';
+              if (this.ownedByLocalUser) {
+                // populate the html overlay with the correct name on init
+                this.nametagInput = document.getElementById('username-overlay');
+                this.nametagInput.value = this.data.name;
+    
+                // add the initial color to the html overlay color picker button
+                document.querySelector('#color-changer').style.backgroundColor = this.data.color;
+                document.querySelector('#color-changer').style.color = this.data.color;
+              }
+            },
+    
+            // here as an example, not used in current demo. Could build a user list, expanding on this.
+            listUsers: function () {
+              console.log(
+                'userlist',
+                [...document.querySelectorAll('[player-info]')].map((el) => el.components['player-info'].data.name)
+              );
+            },
+    
+            newRandomColor: function () {
+              this.el.setAttribute('player-info', 'color', window.ntExample.randomColor());
+            },
+    
+            update: function () {
+              if (this.head) this.head.setAttribute('material', 'color', this.data.color);
+              if (this.nametag) this.nametag.setAttribute('value', this.data.name);
+            }
+          });
+        </script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-randomizer-components@3.0.2/dist/aframe-randomizer-components.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-environment-component@1.3.7/dist/aframe-environment-component.min.js"></script>
+    <script src="/js/spawn-in-circle.component.js"></script>
+    <script src="/js/spawn-in-circle.component.js"></script>
+    <script src="/js/color-changer.component.js"></script>
+    <script src="/js/spawner-persistent.component.js"></script>
+    <script src="/js/persistent-p2p.component.js"></script>
+    <link rel="stylesheet" type="text/css" href="/css/style.css" />
+  </head>
+  <body>
+    <a-scene
+      cursor="rayOrigin: mouse"
+      raycaster="objects:.raycastable"
+      persistent-p2p
+      networked-scene="
+      room: metaversoufg;
+      debug: true;
+      adapter: easyrtc;
+      audio: true;
+      video: true;
+    "
+      renderer="physicallyCorrectLights: true;"
+    >
+    <button
+    id="color-changer"
+    style="z-index: 100; bottom: 24px; left: 24px; position: fixed"
+    onclick="let newColor = window.ntExample.randomColor();
+           document.getElementById('player').setAttribute('player-info', 'color', newColor); 
+           document.querySelector('#color-changer').style.backgroundColor = newColor;
+           document.querySelector('#color-changer').style.color = newColor;
+  "
+  >
+    ■
+  </button>
+  <input
+    id="username-overlay"
+    style="z-index: 100; bottom: 24px; left: 48px; position: fixed"
+    oninput="document.getElementById('player').setAttribute('player-info', 'name', this.value)"
+  />
+
+      <a-assets>
+        <!-- Templates -->
+        <template id="sphere-template">
+          <a-entity class="raycastable" geometry="primitive: sphere" material="color: red" color-changer></a-entity>
+        </template>
+        <!-- Avatar -->
+        <template id="avatar-template">
+          <a-entity class="avatar">
+            <a-plane
+              color="#FFF"
+              width="4"
+              height="3"
+              position="0 .6 0"
+              material="side: back"
+              networked-video-source
+            ></a-plane>
+            <a-plane
+              color="#FFF"
+              width="4"
+              height="3"
+              position="0 .6 0"
+              material="side: front"
+              networked-video-source="streamName: screen"
+            ></a-plane>
+          </a-entity>
+        </template>
+        <template id="s-template">
+          <a-entity class="avatar">
+            <a-sphere class="head" scale="0.45 0.5 0.4"></a-sphere>
+            <a-entity class="face" position="0 0.05 0">
+              <a-sphere class="eye" color="#efefef" position="0.16 0.1 -0.35" scale="0.12 0.12 0.12">
+                <a-sphere class="pupil" color="#000" position="0 0 -1" scale="0.2 0.2 0.2"></a-sphere>
+              </a-sphere>
+              <a-sphere class="eye" color="#efefef" position="-0.16 0.1 -0.35" scale="0.12 0.12 0.12">
+                <a-sphere class="pupil" color="#000" position="0 0 -1" scale="0.2 0.2 0.2"></a-sphere>
+              </a-sphere>
+            </a-entity>
+            <a-text
+            class="nametag"
+            value="Teste"
+            rotation="0 180 0"
+            position=".25 0.6 0"
+            side="double"
+            scale=".5 .5 .5"
+          ></a-text>
+          </a-entity>
+        </template>
+
+        <!-- /Templates -->
+      </a-assets>
+
+      <a-entity id="rig">
+        <a-entity
+          id="player"
+          networked="template:#s-template;attachTemplateToLocal:false;"
+          camera
+          position="0 1.6 0"
+          spawn-in-circle="radius:3"
+          wasd-controls
+          spawner-persistent="template:#sphere-template"
+          look-controls
+        >
+          <a-sphere class="head" visible="false" random-color></a-sphere>
+        </a-entity>
+      </a-entity>
+
+      <a-entity id="camera" spawn-in-circle="radius:3" position="2 1.6 2" networked="template:#avatar-template;attachTemplateToLocal:false;"></a-entity>
+
+      <a-entity environment="preset:default"></a-entity>
+      <a-entity light="type:ambient;intensity:1.0"></a-entity>
+    </a-scene>
+
+    <div class="actions">
+      <button id="camera-btn" type="button" class="button">Desativar Câmera</button>
+      <button id="screen-btn" type="button" class="button">Compartilhar Tela</button>
+    </div>
+
+    <script>
+      // Camera status
+      let cameraEnabled = true;
+      // Camera button element
+      const cameraBtnEle = document.getElementById('camera-btn');
+
+      // Screen share status
+      let screenEnabled = false;
+      // Screen share button element
+      const screenBtnEle = document.getElementById('screen-btn');
+
+      // On mobile remove elements that are resource heavy
+      const isMobile = AFRAME.utils.device.isMobile();
+
+      if (isMobile) {
+        const particles = document.getElementById('particles');
+        particles.parentNode.removeChild(particles);
+      }
+
+      // Called by Networked-Aframe when connected to server
+      function onConnect() {
+        console.log('onConnect', new Date());
+
+        // Handle camera button click (Off and On)
+        cameraBtnEle.addEventListener('click', function () {
+          NAF.connection.adapter.enableCamera(!cameraEnabled);
+          cameraEnabled = !cameraEnabled;
+          cameraBtnEle.textContent = cameraEnabled ? 'Hide Camera' : 'Show Camera';
+        });
+
+        // Handle screen button click (Off and On)
+        screenBtnEle.addEventListener('click', function () {
+          if (screenEnabled) {
+            NAF.connection.adapter.removeLocalMediaStream('screen');
+            screenEnabled = false;
+            screenBtnEle.textContent = 'Share screen';
+          } else {
+            navigator.mediaDevices.getDisplayMedia().then((stream) => {
+              NAF.connection.adapter.addLocalMediaStream(stream, 'screen');
+              stream.getVideoTracks().forEach((track) => {
+                track.addEventListener(
+                  'ended',
+                  () => {
+                    NAF.connection.adapter.removeLocalMediaStream('screen');
+                    screenEnabled = false;
+                    screenBtnEle.textContent = 'Share screen';
+                  },
+                  { once: true }
+                );
+              });
+              screenEnabled = true;
+              screenBtnEle.textContent = 'Stop Screen';
+            });
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
